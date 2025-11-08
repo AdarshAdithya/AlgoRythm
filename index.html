@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AuraCoach – Browser MVP</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <nav class="navbar">
+    <a href="#">Home</a>
+    <a href="#">Sessions</a>
+    <a href="#">Tips</a>
+    <a href="#">About</a>
+  </nav>
+
+  <header class="site-header">
+    <h1>✨ AuraCoach – Browser MVP</h1>
+    <p class="subtitle">Webcam + Mic • Real-time posture & breathing tips • Client-side only</p>
+  </header>
+
+  <main class="shell">
+    <!-- Left: Video Stage -->
+    <section class="card">
+      <div class="stage">
+        <video id="webcam" playsinline muted></video>
+        <canvas id="overlay" aria-label="pose overlay"></canvas>
+      </div>
+
+      <div class="controls">
+        <button id="startBtn" aria-pressed="false">Start Coaching</button>
+        <button id="stopBtn" disabled>Stop</button>
+        <span id="status" class="pill">Idle</span>
+      </div>
+
+      <div class="session-info">
+        <span id="timer">00:00</span>
+        <label class="voice-toggle">
+          <input type="checkbox" id="voiceToggle" /> Voice Tips
+        </label>
+        <button id="themeToggle">Toggle Theme</button>
+      </div>
+
+      <div id="tipCard" class="tip-card">Welcome to AuraCoach!</div>
+      <div class="breath-visualizer" id="breathViz"></div>
+    </section>
+
+    <!-- Right: Stats & Log -->
+    <aside class="card">
+      <div class="stats">
+        <div class="stat">
+          <h3>Torso Tilt</h3>
+          <div class="value"><span id="tilt">–</span>°</div>
+        </div>
+        <div class="stat">
+          <h3>Volume</h3>
+          <div class="value"><span id="volume">–</span></div>
+        </div>
+        <div class="stat">
+          <h3>Last Tip</h3>
+          <div class="value" id="last-tip">—</div>
+        </div>
+      </div>
+
+      <h3 class="log-title">Coach Log</h3>
+      <div id="log" class="log" role="log" aria-live="polite"></div>
+    </aside>
+  </main>
+
+  <footer class="site-footer">
+    <small>Built for Vibecoding Vibathon • Client-side only • No keys</small>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
