@@ -6,6 +6,8 @@ const ctx    = canvas.getContext('2d');
 let webcamStream = null;
 // --- Microphone audio state ---
 let micStream = null, audioContext = null, analyser = null, timeBuf = null, volRAF = null;
+// --- Pose state ---
+let poseLandmarker = null, drawing = null, poseRAF = null;
 
 // Element references
 const logBox = document.getElementById('log');
@@ -60,6 +62,82 @@ function stopCamera() {
   if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
   log('🛑 Camera stopped.');
 }
+// ===== Phase 3: Load MediaPipe Pose (on-demand) =====
+async function loadPose() {
+  if (poseLandmarker) return; // already loaded
+
+  // Dynamic import (keeps index.html unchanged)
+  const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14");
+
+  const fileset = await vision.FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+  );
+
+  poseLandmarker = await vision.PoseLandmarker.createFromOptions(fileset, {
+    baseOptions: {
+      modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task"
+    },
+    runningMode: "VIDEO",
+    numPoses: 1
+  });
+
+  // Drawing utils share your existing canvas ctx
+  drawing = new vision.DrawingUtils(ctx);
+
+  log("🤖 Pose model loaded.");
+}
+// Compute torso tilt angle in degrees using mid-shoulder ↕ mid-hip
+function torsoTiltDeg(lm) {
+  const LS=11, RS=12, LH=23, RH=24;
+  if (!lm?.[LS] || !lm?.[RS] || !lm?.[LH] || !lm?.[RH]) return null;
+  const mid = (a,b)=>({x:(a.x+b.x)/2, y:(a.y+b.y)/2});
+  const shoulder = mid(lm[LS], lm[RS]);
+  const hip      = mid(lm[LH], lm[RH]);
+  const v = { x: hip.x - shoulder.x, y: hip.y - shoulder.y }; // y-down image coords
+  const angleFromVertical = Math.abs(Math.atan2(v.x, v.y));   // radians
+  return +(angleFromVertical * 180 / Math.PI).toFixed(1);
+}
+
+let lastPoseTipAt = 0;
+const TIP_COOLDOWN_MS = 6000;
+
+async function tickPose() {
+  if (!poseLandmarker || !video || video.readyState < 2) {
+    poseRAF = requestAnimationFrame(tickPose);
+    return;
+  }
+
+  const t = performance.now();
+  const res = await poseLandmarker.detectForVideo(video, t);
+
+  // Draw
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if (res?.landmarks?.length) {
+    const lm = res.landmarks[0];
+    drawing.drawLandmarks(lm, { radius: 2.2, color: "#a0c4ff" });
+    // POSE_CONNECTIONS is on the class:
+    drawing.drawConnectors(lm, poseLandmarker.constructor.POSE_CONNECTIONS, { lineWidth: 2, color: "#64dfdf" });
+
+    // Tilt + coaching
+    const tilt = torsoTiltDeg(lm);
+    tiltEl.textContent = tilt ?? "–";
+
+    const now = performance.now();
+    if (tilt !== null) {
+      if (tilt > 18 && now - lastPoseTipAt > TIP_COOLDOWN_MS) {
+        showTip("Straighten your back. Think tall.");
+        lastPoseTipAt = now;
+      } else if (tilt <= 10) {
+        // optional: light status message (no speech)
+        // log("Good posture");
+      }
+    }
+  }
+
+  poseRAF = requestAnimationFrame(tickPose);
+}
+
 // ===== Phase 2B: REAL MIC VOLUME =====
 async function startMic() {
   // Request microphone
